@@ -1,0 +1,6 @@
+.env
+run.sh
+/server
+*.swp
+.vscode/
+vendor/
