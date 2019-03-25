@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/in4it/openvpn/pkg/api"
+	"github.com/in4it/openvpn-access/pkg/api"
 )
 
 func main() {
