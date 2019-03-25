@@ -149,7 +149,12 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 		clientKey  bytes.Buffer
 	)
 	year := time.Now().Format("2006")
-	session, _ := s.sessionStore.Get(r, "token-session")
+	session, err := s.sessionStore.Get(r, "token-session")
+	if err != nil || session.Values["token"] == nil {
+		// handle error
+		json.NewEncoder(w).Encode(errorResponse{Message: "Unauthorized"})
+		return
+	}
 	ctx := context.Background()
 	idToken, err := s.oauth2Verifier.Verify(ctx, session.Values["token"].(string))
 	if err != nil {
