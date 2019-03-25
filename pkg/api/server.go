@@ -7,11 +7,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
 	"golang.org/x/oauth2"
 )
 
@@ -26,6 +28,7 @@ type server struct {
 	config         Config
 	oauth2Config   oauth2.Config
 	oauth2Verifier *oidc.IDTokenVerifier
+	sessionStore   *sessions.CookieStore
 }
 
 type response struct {
@@ -48,6 +51,7 @@ func (s *server) Start() {
 	r.HandleFunc("/", s.homeHandler)
 	r.HandleFunc("/login", s.loginHandler)
 	r.HandleFunc("/callback", s.callbackHandler)
+	r.HandleFunc("/ovpnconfig", s.ovpnConfigHandler)
 	http.Handle("/", r)
 
 	// initialize oidc
@@ -55,6 +59,9 @@ func (s *server) Start() {
 	if err != nil {
 		log.Fatalf("Could not initialize oauth2: %s", err)
 	}
+
+	// initialize session store
+	s.sessionStore = sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
 
 	// enable csrf
 	CSRF := csrf.Protect([]byte(os.Getenv("CSRF_KEY")))
@@ -103,6 +110,8 @@ func (s *server) loginHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, s.oauth2Config.AuthCodeURL(csrf.Token(r)), http.StatusFound)
 }
 func (s *server) callbackHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := s.sessionStore.Get(r, "token-session")
+
 	ctx := context.Background()
 	oauth2Token, err := s.oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
 	if err != nil {
@@ -117,11 +126,26 @@ func (s *server) callbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// save token
+	session.Values["token"] = rawIDToken
+	session.Save(r, w)
+
 	// Parse and verify ID Token payload.
-	idToken, err := s.oauth2Verifier.Verify(ctx, rawIDToken)
+	_, err = s.oauth2Verifier.Verify(ctx, rawIDToken)
 	if err != nil {
 		// handle error
 		json.NewEncoder(w).Encode(errorResponse{Message: "token verification failed"})
+		return
+	}
+}
+
+func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := s.sessionStore.Get(r, "token-session")
+	ctx := context.Background()
+	idToken, err := s.oauth2Verifier.Verify(ctx, session.Values["token"].(string))
+	if err != nil {
+		// handle error
+		json.NewEncoder(w).Encode(errorResponse{Message: "Unauthorized - token verification failed"})
 		return
 	}
 
@@ -134,4 +158,42 @@ func (s *server) callbackHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(errorResponse{Message: "claims error"})
 		return
 	}
+
+	// retrieve CA key / crt
+	s3 := NewS3()
+	caKey, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/ca.crt")
+	if err != nil {
+		json.NewEncoder(w).Encode(errorResponse{Message: "ca.crt download error: " + err.Error()})
+	}
+	caCert, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/ca.key")
+	if err != nil {
+		json.NewEncoder(w).Encode(errorResponse{Message: "ca.crt download error: " + err.Error()})
+	}
+	// create new cert
+	c := NewCert()
+	parsedCaCert, err := c.readCert(caCert.String())
+	if err != nil {
+		json.NewEncoder(w).Encode(errorResponse{Message: "Parsed CA cert Error: " + err.Error()})
+		return
+	}
+	parsedCaKey, err := c.readPrivateKey(caKey.String())
+	if err != nil {
+		json.NewEncoder(w).Encode(errorResponse{Message: "Parsed CA key Error: " + err.Error()})
+		return
+	}
+	clientCert, clientKey, err := c.createClientCert(parsedCaCert, parsedCaKey, "test-subject")
+	if err != nil {
+		json.NewEncoder(w).Encode(errorResponse{Message: "Create Cert error: " + err.Error()})
+		return
+	}
+
+	// output openvpn config
+	ovpnConfig, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/openvpn-client.conf")
+	strOvpnConfig := ovpnConfig.String()
+	if err != nil {
+		json.NewEncoder(w).Encode(errorResponse{Message: "openvpn-client.conf download error: " + err.Error()})
+	}
+	strOvpnConfig = strings.Replace(strOvpnConfig, "[CERT]", clientCert.String(), -1)
+	strOvpnConfig = strings.Replace(strOvpnConfig, "[KEY]", clientKey.String(), -1)
+	fmt.Fprintf(w, strOvpnConfig)
 }
