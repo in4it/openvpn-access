@@ -218,8 +218,8 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// write key and cert to S3
-	s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+claims.Email+"-"+year+".crt", clientCert.String())
-	s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/client-"+claims.Email+"-"+year+".key", clientKey.String())
+	s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+claims.Email+"-"+year+".crt", clientCert.String(), os.Getenv("S3_KMS_ARN"))
+	s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/client-"+claims.Email+"-"+year+".key", clientKey.String(), os.Getenv("S3_KMS_ARN"))
 
 	// output openvpn config
 	ovpnConfig, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/openvpn-client.conf")

@@ -66,18 +66,20 @@ func (s *s3Struct) getObject(bucket, item string) (bytes.Buffer, error) {
 	}
 	return out, nil
 }
-func (s *s3Struct) putObject(bucket, item, data string) error {
+func (s *s3Struct) putObject(bucket, item, data, kmsArn string) error {
 	reader := strings.NewReader(data)
 
 	uploader := s3manager.NewUploader(s.sess)
-
-	_, err := uploader.Upload(&s3manager.UploadInput{
+	uploadInput := s3manager.UploadInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(item),
-		// here you pass your reader
-		// the aws sdk will manage all the memory and file reading for you
-		Body: reader,
-	})
+		Body:   reader,
+	}
+	if kmsArn != "" {
+		uploadInput.SSEKMSKeyId = aws.String(kmsArn)
+		uploadInput.ServerSideEncryption = aws.String("aws:kms")
+	}
+	_, err := uploader.Upload(&uploadInput)
 	if err != nil {
 		return fmt.Errorf("Unable to upload %q to %q, %v", item, bucket, err)
 	}
