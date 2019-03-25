@@ -3,7 +3,7 @@ Provides a web frontend with OpenID Connect authentication that can create and s
 
 # Configuration
 | Environment Variable | Description |
-| ==================== | =========== |
+| -------------------- | ----------- |
 | OAUTH2\_CLIENT\_ID | client id |
 | OAUTH2\_CLIENT\_SECRET | client secret |
 | OAUTH2\_REDIRECT\_URL | callback, e.g. http://url/callback |
