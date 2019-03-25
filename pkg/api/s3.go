@@ -26,6 +26,19 @@ func NewS3() (*s3Struct, error) {
 	}
 	return &s3Struct{sess: sess}, nil
 }
+func (s *s3Struct) headObject(bucket, item string) error {
+
+	svc := s3.New(session.New())
+	_, err := svc.HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(item),
+	})
+	if err == nil {
+		return nil
+	} else {
+		return err
+	}
+}
 
 func (s *s3Struct) getObject(bucket, item string) (bytes.Buffer, error) {
 	var out bytes.Buffer

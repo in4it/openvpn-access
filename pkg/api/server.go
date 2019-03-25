@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/csrf"
@@ -142,6 +144,11 @@ func (s *server) callbackHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		clientCert bytes.Buffer
+		clientKey  bytes.Buffer
+	)
+	year := time.Now().Format("2006")
 	session, _ := s.sessionStore.Get(r, "token-session")
 	ctx := context.Background()
 	idToken, err := s.oauth2Verifier.Verify(ctx, session.Values["token"].(string))
@@ -161,12 +168,19 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// retrieve CA key / crt
+	// check s3 if .crt / .key is already created
 	s3, err := NewS3()
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "Could not create session: " + err.Error()})
 		return
 	}
+	err = s3.headObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+claims.Email+"-"+year+".crt")
+	if err == nil {
+		clientCert, _ = s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+claims.Email+"-"+year+".crt")
+		clientKey, _ = s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/client-"+claims.Email+"-"+year+".key")
+	}
+
+	// retrieve CA key / crt
 	caKey, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/ca.key")
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "ca.crt download error: " + err.Error()})
@@ -182,28 +196,30 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(errorResponse{Message: "ta.key download error: " + err.Error()})
 		return
 	}
-	// create new cert
-	c := NewCert()
-	parsedCaCert, err := c.readCert(caCert.String())
-	if err != nil {
-		fmt.Printf("cert: %s", caCert.String())
-		json.NewEncoder(w).Encode(errorResponse{Message: "Parsed CA cert Error: " + err.Error()})
-		return
-	}
-	parsedCaKey, err := c.readPrivateKey(caKey.String())
-	if err != nil {
-		json.NewEncoder(w).Encode(errorResponse{Message: "Parsed CA key Error: " + err.Error()})
-		return
-	}
-	clientCert, clientKey, err := c.createClientCert(parsedCaCert, parsedCaKey, claims.Email)
-	if err != nil {
-		json.NewEncoder(w).Encode(errorResponse{Message: "Create Cert error: " + err.Error()})
-		return
+	// create new cert (if not cached)
+	if clientCert.Len() == 0 || clientKey.Len() == 0 {
+		c := NewCert()
+		parsedCaCert, err := c.readCert(caCert.String())
+		if err != nil {
+			fmt.Printf("cert: %s", caCert.String())
+			json.NewEncoder(w).Encode(errorResponse{Message: "Parsed CA cert Error: " + err.Error()})
+			return
+		}
+		parsedCaKey, err := c.readPrivateKey(caKey.String())
+		if err != nil {
+			json.NewEncoder(w).Encode(errorResponse{Message: "Parsed CA key Error: " + err.Error()})
+			return
+		}
+		clientCert, clientKey, err = c.createClientCert(parsedCaCert, parsedCaKey, claims.Email)
+		if err != nil {
+			json.NewEncoder(w).Encode(errorResponse{Message: "Create Cert error: " + err.Error()})
+			return
+		}
 	}
 
 	// write key and cert to S3
-	s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+claims.Email+".crt", clientCert.String())
-	s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/client-"+claims.Email+".key", clientKey.String())
+	s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+claims.Email+"-"+year+".crt", clientCert.String())
+	s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/client-"+claims.Email+"-"+year+".key", clientKey.String())
 
 	// output openvpn config
 	ovpnConfig, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/openvpn-client.conf")
