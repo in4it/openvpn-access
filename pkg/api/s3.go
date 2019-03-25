@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -18,13 +19,17 @@ type s3Struct struct {
 /*
  * cert
  */
-func NewS3() *s3Struct {
-	sess, _ := session.NewSession()
-	return &s3Struct{sess: sess}
+func NewS3() (*s3Struct, error) {
+	sess, err := session.NewSession()
+	if err != nil {
+		return nil, err
+	}
+	return &s3Struct{sess: sess}, nil
 }
 
 func (s *s3Struct) getObject(bucket, item string) (bytes.Buffer, error) {
 	var out bytes.Buffer
+	var err error
 
 	requestInput := s3.GetObjectInput{
 		Bucket: aws.String(bucket),
@@ -33,15 +38,36 @@ func (s *s3Struct) getObject(bucket, item string) (bytes.Buffer, error) {
 
 	buf := aws.NewWriteAtBuffer([]byte{})
 	downloader := s3manager.NewDownloader(s.sess)
-	downloader.Download(buf, &requestInput)
-
-	if len(buf.Bytes()) == 0 {
-		return out, fmt.Errorf("Unable to download item %q (0 bytes downloaded)", item)
+	_, err = downloader.Download(buf, &requestInput)
+	if err != nil {
+		return out, fmt.Errorf("S3 Download error %s", err)
 	}
 
-	_, err := io.Copy(&out, bytes.NewReader(buf.Bytes()))
+	if len(buf.Bytes()) == 0 {
+		return out, fmt.Errorf("Unable to download item %q, bucket %q (0 bytes downloaded)", item, bucket)
+	}
+
+	_, err = io.Copy(&out, bytes.NewReader(buf.Bytes()))
 	if err != nil {
 		return out, fmt.Errorf("Unable to output buffer")
 	}
 	return out, nil
+}
+func (s *s3Struct) putObject(bucket, item, data string) error {
+	reader := strings.NewReader(data)
+
+	uploader := s3manager.NewUploader(s.sess)
+
+	_, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(item),
+		// here you pass your reader
+		// the aws sdk will manage all the memory and file reading for you
+		Body: reader,
+	})
+	if err != nil {
+		return fmt.Errorf("Unable to upload %q to %q, %v", item, bucket, err)
+	}
+
+	return nil
 }
