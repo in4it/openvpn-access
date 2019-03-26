@@ -220,11 +220,18 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(errorResponse{Message: "Create Cert error: " + err.Error()})
 			return
 		}
+		// write key and cert to S3
+		err = s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+claims.Email+"-"+year+".crt", clientCert.String(), os.Getenv("S3_KMS_ARN"))
+		if err != nil {
+			json.NewEncoder(w).Encode(errorResponse{Message: "S3 put error: " + err.Error()})
+			return
+		}
+		err = s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/client-"+claims.Email+"-"+year+".key", clientKey.String(), os.Getenv("S3_KMS_ARN"))
+		if err != nil {
+			json.NewEncoder(w).Encode(errorResponse{Message: "S3 put error: " + err.Error()})
+			return
+		}
 	}
-
-	// write key and cert to S3
-	s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+claims.Email+"-"+year+".crt", clientCert.String(), os.Getenv("S3_KMS_ARN"))
-	s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/client-"+claims.Email+"-"+year+".key", clientKey.String(), os.Getenv("S3_KMS_ARN"))
 
 	// output openvpn config
 	ovpnConfig, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/openvpn-client.conf")
