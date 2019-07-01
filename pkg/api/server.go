@@ -50,10 +50,21 @@ func NewServer(conf Config) *server {
 }
 func (s *server) Start() {
 	r := mux.NewRouter()
-	r.HandleFunc("/", s.homeHandler)
-	r.HandleFunc("/login", s.loginHandler)
-	r.HandleFunc("/callback", s.callbackHandler)
-	r.HandleFunc("/ovpnconfig", s.ovpnConfigHandler)
+
+	prefix := os.Getenv("URL_PREFIX")
+	if prefix == "" {
+		prefix = "/"
+	}
+
+	if prefix != "/" {
+		r.HandleFunc("/", s.rootHandler)
+	}
+
+	r.HandleFunc(prefix, s.homeHandler)
+	r.HandleFunc(prefix+"/login", s.loginHandler)
+	r.HandleFunc(prefix+"/callback", s.callbackHandler)
+	r.HandleFunc(prefix+"/ovpnconfig", s.ovpnConfigHandler)
+
 	http.Handle("/", r)
 
 	// initialize oidc
@@ -72,7 +83,7 @@ func (s *server) Start() {
 	loggedRouter := handlers.LoggingHandler(os.Stdout, CSRF(r))
 
 	// start server
-	fmt.Printf("Starting server on port %s\n", s.config.Port)
+	fmt.Printf("Starting server on port %s with prefix %s\n", s.config.Port, prefix)
 	log.Fatal(http.ListenAndServe(":"+s.config.Port, loggedRouter))
 }
 
@@ -99,6 +110,13 @@ func (s *server) oauthInit() error {
 	s.oauth2Verifier = provider.Verifier(&oidc.Config{ClientID: os.Getenv("OAUTH2_CLIENT_ID")})
 
 	return nil
+}
+
+func (s *server) rootHandler(w http.ResponseWriter, r *http.Request) {
+	var response response
+	response.Message = "This app is installed in " + os.Getenv("URL_PREFIX")
+	json.NewEncoder(w).Encode(response)
+
 }
 
 func (s *server) homeHandler(w http.ResponseWriter, r *http.Request) {
