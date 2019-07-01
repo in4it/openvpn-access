@@ -3,7 +3,7 @@
 #
 FROM golang:1.12-alpine as go-builder
 
-WORKDIR /go/src/github.com/in4it/openvpn-access
+WORKDIR /openvpn-access
 
 COPY . .
 
@@ -20,7 +20,7 @@ RUN apk --no-cache add ca-certificates && mkdir -p /app
 
 WORKDIR /app
 
-COPY --from=go-builder /go/src/github.com/in4it/openvpn-access/openvpn-access /app/openvpn-access
+COPY --from=go-builder /openvpn-access /app/openvpn-access
 
 CMD ["./openvpn-access"]  
 
