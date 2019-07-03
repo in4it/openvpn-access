@@ -52,15 +52,16 @@ func (s *server) Start() {
 	r := mux.NewRouter()
 
 	prefix := os.Getenv("URL_PREFIX")
+	prefixRoot := prefix
 	if prefix == "" {
-		prefix = "/"
+		prefixRoot = "/"
 	}
 
 	if prefix != "/" {
 		r.HandleFunc("/", s.rootHandler)
 	}
 
-	r.HandleFunc(prefix, s.homeHandler)
+	r.HandleFunc(prefixRoot, s.homeHandler)
 	r.HandleFunc(prefix+"/login", s.loginHandler)
 	r.HandleFunc(prefix+"/callback", s.callbackHandler)
 	r.HandleFunc(prefix+"/ovpnconfig", s.ovpnConfigHandler)
@@ -158,7 +159,7 @@ func (s *server) callbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/ovpnconfig", 301)
+	http.Redirect(w, r, os.Getenv("URL_PREFIX")+"/ovpnconfig", 301)
 }
 
 func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
