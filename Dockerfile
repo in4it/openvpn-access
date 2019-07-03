@@ -20,7 +20,7 @@ RUN apk --no-cache add ca-certificates && mkdir -p /app
 
 WORKDIR /app
 
-COPY --from=go-builder /openvpn-access /app/openvpn-access
+COPY --from=go-builder /openvpn-access/openvpn-access /app/openvpn-access
 
 CMD ["./openvpn-access"]  
 
