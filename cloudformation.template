@@ -1,0 +1,252 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Launch openvpn access
+
+Parameters:
+  VPCId:
+    Type: String
+    Description: vpc-id of the vpc where to deploy the vpn access server
+  SubnetId1:
+    Type: String
+    Description: first subnet-id of the vpc subnet where to deploy the vpn access server
+  SubnetId2:
+    Type: String
+    Description: second subnet-id of the vpc subnet where to deploy the vpn access server
+  AssignPublicIp:
+    Type: String
+    Description: "If the supplied subnets are in a public subnet, assign public IP to the container (otherwise there will be no outgoing network connectivity)?"
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+  OAUTH2ClientId:
+    Type: String
+    Description: oauth2 client id
+  OAUTH2ClientSecret:
+    Type: String
+    Description: oauth2 client secret
+  ClientCertOrg:
+    Type: String
+    Description: client organization
+  CSRFKey:
+    Type: String
+    Description: "32 bytes long random key (for example: LUMY9Zd2QgHLrZXPkn790k4nrUoeXqwP)"
+
+
+Resources:
+  ExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "ecs-tasks.amazonaws.com" 
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        -
+          PolicyName: "root"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - ssm:GetParameters
+                  - ssm:GetParameter
+                Resource: "*"
+  TaskRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "ecs-tasks.amazonaws.com" 
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+  OpenVPNAccessCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: openvpn-access
+  OpenVPNAccessTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties: 
+      ContainerDefinitions: 
+        - Essential: true
+          Image: in4it/openvpn-access:latest
+          LogConfiguration: 
+            LogDriver: awslogs
+            Options:
+              awslogs-group: openvpn-access
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: openvpn-access
+          Name: openvpn-access
+          PortMappings: 
+            - ContainerPort: 8080
+              HostPort: 8080
+              Protocol: tcp
+          Environment: 
+            - Name: OAUTH2_CLIENT_ID
+              Value: !Ref OAUTH2ClientId
+            - Name: OAUTH2_CLIENT_SECRET
+              Value: !Ref OAUTH2ClientSecret
+            - Name: OAUTH2_REDIRECT_URL
+              Value: !GetAtt OpenVPNAccessLB.DNSName
+            - Name: OAUTH2_URL
+              Value:
+                Fn::Join: 
+                    - ""
+                    - - !GetAtt OpenVPNAccessLB.DNSName
+                      - "/callback"
+            - Name: CSRF_KEY
+              Value: !Ref CSRFKey
+            - Name: CLIENT_CERT_ORG
+              Value: !Ref ClientCertOrg
+            - Name: S3_BUCKET
+              Value: !Ref OpenVPNAccessBucket
+            - Name: S3_PREFIX
+              Value: config
+            - Name: S3_KMS_ARN
+              Value: !GetAtt OpenVPNAccessKey.Arn
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+      Cpu: 256
+      ExecutionRoleArn: !Ref ExecutionRole
+      Family: OpenVPNAccess
+      Memory: 1024
+      NetworkMode: awsvpc
+      RequiresCompatibilities: 
+        - FARGATE
+      TaskRoleArn: !Ref TaskRole
+  OpenVPNAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: openvpn-access
+      RetentionInDays: 30
+  OpenVPNAccessService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref OpenVPNAccessCluster
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DesiredCount: 1
+      LaunchType: FARGATE
+      TaskDefinition: !Ref OpenVPNAccessTaskDef
+      ServiceName: openvpn-access
+      LoadBalancers:
+        - TargetGroupArn: !Ref OpenVPNAccessLBTargetGroup
+          ContainerPort: 8080
+          ContainerName: openvpn-access
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: !Ref AssignPublicIp
+          SecurityGroups: 
+            - !Ref OpenVPNAccessSecurityGroup
+          Subnets:
+            - !Ref SubnetId1
+            - !Ref SubnetId2
+  OpenVPNAccessBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName:
+        Fn::Join: 
+        - ""
+        - - 'openvpn-access-'
+          - !Ref AWS::Region
+          - '-'
+          - !Ref AWS::AccountId
+  OpenVPNAccessKey:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action: 'kms:*'
+            Resource: '*'
+  OpenVPNAccessLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+        IpAddressType: ipv4
+        Name: openvpn-access
+        Scheme: internet-facing
+        SecurityGroups: 
+            - !Ref OpenVPNAccessLBSecurityGroup
+        Subnets: 
+            - !Ref SubnetId1
+            - !Ref SubnetId2
+        Type: application
+  OpenVPNAccessLBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: loadbalancer sg
+        VpcId: !Ref VPCId
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+  OpenVPNAccessSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Allow http for proxy
+        VpcId: !Ref VPCId
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref OpenVPNAccessLBSecurityGroup
+        SecurityGroupEgress:
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+  OpenVPNAccessLBListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+        DefaultActions:
+        - Type: "forward"
+          TargetGroupArn: !Ref OpenVPNAccessLBTargetGroup
+        LoadBalancerArn: !Ref OpenVPNAccessLB
+        Port: 80
+        Protocol: "HTTP"
+  OpenVPNAccessLBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+        HealthCheckEnabled: true
+        HealthCheckIntervalSeconds: 30
+        HealthCheckPath: /
+        HealthCheckPort: 8080
+        HealthCheckProtocol: HTTP
+        HealthCheckTimeoutSeconds: 10
+        HealthyThresholdCount: 2
+        Name: openvpn-access
+        TargetType: ip
+        Port: 8080
+        Protocol: HTTP
+        VpcId: !Ref VPCId
