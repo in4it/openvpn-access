@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,6 +17,7 @@ type Auth struct {
 	oauth2Verifier *oidc.IDTokenVerifier
 	idToken        *oidc.IDToken
 	authType       string
+	login          string
 }
 
 func NewAuth() *Auth {
@@ -40,8 +42,8 @@ func (a *Auth) oauthInit() error {
 	if os.Getenv("AUTH_TYPE") == "github" {
 		a.oauth2Config.Scopes = []string{"all"}
 		a.oauth2Config.Endpoint = oauth2.Endpoint{
-			AuthURL:  os.Getenv("OAUTH2_AUTHORIZE_URL"),
-			TokenURL: os.Getenv("OAUTH2_TOKEN_URL"),
+			AuthURL:  "https://github.com/login/oauth/authorize",
+			TokenURL: "https://github.com/login/oauth/access_token",
 		}
 		a.authType = "github"
 	} else {
@@ -75,31 +77,60 @@ func (a *Auth) getToken(code string) (string, error) {
 		return "", fmt.Errorf("Oauth2 exchange error: %s", err)
 	}
 
-	// Extract the ID Token from OAuth2 token.
-	token, ok := oauth2Token.Extra("id_token").(string)
-	if !ok {
-		return "", fmt.Errorf("missing token")
+	switch a.authType {
+	case "oidc":
+		// Extract the ID Token from OAuth2 token.
+		token, ok := oauth2Token.Extra("id_token").(string)
+		if !ok {
+			return "", fmt.Errorf("missing token")
+		}
+		return token, nil
+	case "github":
+		// return access token
+		return oauth2Token.AccessToken, nil
+	default:
+		return "", fmt.Errorf("Misconfiguration: Auth type not recognized")
+
 	}
-	return token, nil
 }
 func (a *Auth) verifyToken(token string) error {
 	var err error
 	ctx := context.Background()
 	switch a.authType {
 	case "oidc":
+		var claims Claims
+
 		a.idToken, err = a.oauth2Verifier.Verify(ctx, token)
 		if err != nil {
 			return fmt.Errorf("token verification failed: %s", err)
 		}
+
+		if err := a.idToken.Claims(&claims); err != nil {
+			return err
+		}
+		a.login = claims.Email
+
 		return nil
 	case "github":
+		var githubUser GitHubUser
+		client := &http.Client{}
 		req, err := http.NewRequest("GET", "https://api.github.com/user", nil)
 		if err != nil {
 			return err
 		}
 		req.Header.Add("Authorization", "token "+token)
 		resp, err := client.Do(req)
-		// extract login
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		json.NewDecoder(resp.Body).Decode(&githubUser)
+
+		if githubUser.Message != "" {
+			return fmt.Errorf("Github response: " + githubUser.Message)
+		}
+
+		a.login = githubUser.Login
 
 		return nil
 	default:
@@ -107,11 +138,6 @@ func (a *Auth) verifyToken(token string) error {
 	}
 }
 
-func (a *Auth) getClaims() (Claims, error) {
-	var claims Claims
-
-	if err := a.idToken.Claims(&claims); err != nil {
-		return claims, err
-	}
-	return claims, nil
+func (a *Auth) getLogin() string {
+	return a.login
 }

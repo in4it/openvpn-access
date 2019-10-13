@@ -7,5 +7,6 @@ type Claims struct {
 }
 
 type GitHubUser struct {
-	Login string `json:"login"`
+	Login   string `json:"login"`
+	Message string `json:"message"`
 }
