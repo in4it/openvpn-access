@@ -29,6 +29,15 @@ Parameters:
   CSRFKey:
     Type: String
     Description: "32 bytes long random key (for example: LUMY9Zd2QgHLrZXPkn790k4nrUoeXqwP)"
+  AuthType:
+    Type: String
+    Description: The authentication Type (github / oidc)
+    AllowedValues:
+      - github
+      - oidc
+  OIDCRedirectURL:
+    Type: String
+    Description: If auth type is OIDC, enter the OIDC autodiscovery url here
 
 
 Resources:
@@ -100,13 +109,14 @@ Resources:
               Value: !Ref OAUTH2ClientId
             - Name: OAUTH2_CLIENT_SECRET
               Value: !Ref OAUTH2ClientSecret
-            - Name: OAUTH2_REDIRECT_URL
-              Value: !GetAtt OpenVPNAccessLB.DNSName
             - Name: OAUTH2_URL
+              Value: !Ref OIDCRedirectURL
+            - Name: OAUTH2_REDIRECT_URL
               Value:
                 Fn::Join: 
                     - ""
-                    - - !GetAtt OpenVPNAccessLB.DNSName
+                    - - "http://"
+                      - !GetAtt OpenVPNAccessLB.DNSName
                       - "/callback"
             - Name: CSRF_KEY
               Value: !Ref CSRFKey
@@ -120,6 +130,8 @@ Resources:
               Value: !GetAtt OpenVPNAccessKey.Arn
             - Name: AWS_REGION
               Value: !Ref AWS::Region
+            - Name: AUTH_TYPE
+              Value: !Ref AuthType
       Cpu: 256
       ExecutionRoleArn: !Ref ExecutionRole
       Family: OpenVPNAccess
@@ -167,6 +179,48 @@ Resources:
           - !Ref AWS::Region
           - '-'
           - !Ref AWS::AccountId
+  S3AccessIAMManagedRolePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: "openvpn-access-s3-rw-access"
+      Roles:
+        - !Ref TaskRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action:
+              - "s3:Put*"
+              - "s3:Get*"
+            Resource:
+              Fn::Join: 
+              - ""
+              - - !GetAtt OpenVPNAccessBucket.Arn
+                - "/*"
+          -
+            Effect: "Allow"
+            Action:
+              - "s3:ListBucket"
+            Resource: !GetAtt OpenVPNAccessBucket.Arn
+  KMSAccessIAMManagedRolePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: "openvpn-access-kms-access"
+      Roles:
+        - !Ref TaskRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action:
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
+            Resource: !GetAtt OpenVPNAccessKey.Arn
   OpenVPNAccessKey:
     Type: AWS::KMS::Key
     Properties:
