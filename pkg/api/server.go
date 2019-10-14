@@ -87,7 +87,7 @@ func (s *server) Start() {
 
 func (s *server) rootHandler(w http.ResponseWriter, r *http.Request) {
 	var response response
-	response.Message = "app up & running"
+	response.Message = "app up and running"
 	json.NewEncoder(w).Encode(response)
 
 }
