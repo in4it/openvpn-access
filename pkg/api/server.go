@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"github.com/in4it/openvpn-access/pkg/storage"
 )
 
 /*
@@ -152,30 +153,32 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// check s3 if .crt / .key is already created
-	s3, err := NewS3()
+	// check in storage if .crt / .key is already created
+	blobStorage, err := storage.NewS3()
+	storageBucket := os.Getenv("S3_BUCKET")
+	storagePrefix := os.Getenv("S3_PREFIX")
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "Could not create session: " + err.Error()})
 		return
 	}
-	err = s3.headObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+login+"-"+year+".crt")
+	err = blobStorage.HeadObject(storageBucket, storagePrefix+"/pki/issued/client-"+login+"-"+year+".crt")
 	if err == nil {
-		clientCert, _ = s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+login+"-"+year+".crt")
-		clientKey, _ = s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/client-"+login+"-"+year+".key")
+		clientCert, _ = blobStorage.GetObject(storageBucket, storagePrefix+"/pki/issued/client-"+login+"-"+year+".crt")
+		clientKey, _ = blobStorage.GetObject(storageBucket, storagePrefix+"/pki/private/client-"+login+"-"+year+".key")
 	}
 
 	// retrieve CA key / crt
-	caKey, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/ca.key")
+	caKey, err := blobStorage.GetObject(storageBucket, storagePrefix+"/pki/private/ca.key")
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "ca.crt download error: " + err.Error()})
 		return
 	}
-	caCert, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/ca.crt")
+	caCert, err := blobStorage.GetObject(storageBucket, storagePrefix+"/pki/ca.crt")
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "ca.crt download error: " + err.Error()})
 		return
 	}
-	taKey, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/ta.key")
+	taKey, err := blobStorage.GetObject(storageBucket, storagePrefix+"/pki/ta.key")
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "ta.key download error: " + err.Error()})
 		return
@@ -200,12 +203,12 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// write key and cert to S3
-		err = s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/issued/client-"+login+"-"+year+".crt", clientCert.String(), os.Getenv("S3_KMS_ARN"))
+		err = blobStorage.PutObject(storageBucket, storagePrefix+"/pki/issued/client-"+login+"-"+year+".crt", clientCert.String(), os.Getenv("S3_KMS_ARN"))
 		if err != nil {
 			json.NewEncoder(w).Encode(errorResponse{Message: "S3 put error: " + err.Error()})
 			return
 		}
-		err = s3.putObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/pki/private/client-"+login+"-"+year+".key", clientKey.String(), os.Getenv("S3_KMS_ARN"))
+		err = blobStorage.PutObject(storageBucket, storagePrefix+"/pki/private/client-"+login+"-"+year+".key", clientKey.String(), os.Getenv("S3_KMS_ARN"))
 		if err != nil {
 			json.NewEncoder(w).Encode(errorResponse{Message: "S3 put error: " + err.Error()})
 			return
@@ -213,7 +216,7 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// output openvpn config
-	ovpnConfig, err := s3.getObject(os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX")+"/openvpn-client.conf")
+	ovpnConfig, err := blobStorage.GetObject(storageBucket, storagePrefix+"/openvpn-client.conf")
 	strOvpnConfig := ovpnConfig.String()
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "openvpn-client.conf download error: " + err.Error()})

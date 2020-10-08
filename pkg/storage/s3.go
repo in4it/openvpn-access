@@ -1,4 +1,4 @@
-package api
+package storage
 
 import (
 	"bytes"
@@ -13,20 +13,21 @@ import (
 )
 
 type s3Struct struct {
+	StorageIf
 	sess *session.Session
 }
 
 /*
  * cert
  */
-func NewS3() (*s3Struct, error) {
+func NewS3() (StorageIf, error) {
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
 	}
 	return &s3Struct{sess: sess}, nil
 }
-func (s *s3Struct) headObject(bucket, item string) error {
+func (s *s3Struct) HeadObject(bucket, item string) error {
 
 	svc := s3.New(session.New())
 	_, err := svc.HeadObject(&s3.HeadObjectInput{
@@ -40,7 +41,7 @@ func (s *s3Struct) headObject(bucket, item string) error {
 	}
 }
 
-func (s *s3Struct) getObject(bucket, item string) (bytes.Buffer, error) {
+func (s *s3Struct) GetObject(bucket, item string) (bytes.Buffer, error) {
 	var out bytes.Buffer
 	var err error
 
@@ -66,7 +67,7 @@ func (s *s3Struct) getObject(bucket, item string) (bytes.Buffer, error) {
 	}
 	return out, nil
 }
-func (s *s3Struct) putObject(bucket, item, data, kmsArn string) error {
+func (s *s3Struct) PutObject(bucket, item, data, kmsArn string) error {
 	reader := strings.NewReader(data)
 
 	uploader := s3manager.NewUploader(s.sess)
