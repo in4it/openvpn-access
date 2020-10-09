@@ -200,21 +200,21 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(errorResponse{Message: "Create Cert error: " + err.Error()})
 			return
 		}
-		// write key and cert to S3
+		// write key and cert to Blob Storage
 		err = blobStorage.PutObject(storageBucket, storagePrefix+"issued/client-"+login+"-"+year+".crt", clientCert.String(), os.Getenv("S3_KMS_ARN"))
 		if err != nil {
-			json.NewEncoder(w).Encode(errorResponse{Message: "S3 put error: " + err.Error()})
+			json.NewEncoder(w).Encode(errorResponse{Message: "Blob Storage Put error: " + err.Error()})
 			return
 		}
 		err = blobStorage.PutObject(storageBucket, storagePrefix+"private/client-"+login+"-"+year+".key", clientKey.String(), os.Getenv("S3_KMS_ARN"))
 		if err != nil {
-			json.NewEncoder(w).Encode(errorResponse{Message: "S3 put error: " + err.Error()})
+			json.NewEncoder(w).Encode(errorResponse{Message: "Blob Storage Put error: " + err.Error()})
 			return
 		}
 	}
 
 	// output openvpn config
-	ovpnConfig, err := blobStorage.GetObject(storageBucket, storagePrefix+"/openvpn-client.conf")
+	ovpnConfig, err := blobStorage.GetObject(storageBucket, storagePrefix+"openvpn-client.conf")
 	strOvpnConfig := ovpnConfig.String()
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "openvpn-client.conf download error: " + err.Error()})
