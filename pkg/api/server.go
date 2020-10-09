@@ -236,11 +236,11 @@ func (s *server) getStorage() (storage.StorageIf, string, string, error) {
 	if os.Getenv("STORAGE_TYPE") == "azblob" {
 		if os.Getenv("AZ_STORAGE_ACCOUNT_KEY") != "" {
 			blobStorage, err := storage.NewAzBlob(os.Getenv("AZ_STORAGE_ACCOUNT_NAME"), os.Getenv("AZ_STORAGE_ACCOUNT_KEY"))
-			return blobStorage, os.Getenv("AZ_STORAGE_ACCOUNT_CONTAINER"), "/pki", err
+			return blobStorage, os.Getenv("AZ_STORAGE_ACCOUNT_CONTAINER"), "", err
 		}
 		// with MSI
 		blobStorage, err := storage.NewAzBlobWithMSI(os.Getenv("AZ_STORAGE_ACCOUNT_NAME"))
-		return blobStorage, os.Getenv("AZ_STORAGE_ACCOUNT_CONTAINER"), "/pki", err
+		return blobStorage, os.Getenv("AZ_STORAGE_ACCOUNT_CONTAINER"), "", err
 	}
 	// default storage
 	blobStorage, err := storage.NewS3()
