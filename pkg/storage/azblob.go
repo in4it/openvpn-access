@@ -32,8 +32,17 @@ func NewAzBlob(accountName, accountKey string) (StorageIf, error) {
 	}, nil
 }
 
-func (a *azBlob) HeadObject(bucket, item string) error {
+func (a *azBlob) HeadObject(container, item string) error {
+	ctx := context.Background()
+	containerURL := a.serviceURL.NewContainerURL(container)
+	blobURL := containerURL.NewBlockBlobURL(item)
+	_, err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{})
+	if err != nil {
+		return err
+	}
+
 	return nil
+
 }
 func (a *azBlob) GetObject(container, item string) (bytes.Buffer, error) {
 	buffer := bytes.Buffer{}

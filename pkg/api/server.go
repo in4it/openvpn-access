@@ -159,24 +159,24 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(errorResponse{Message: "Could not create session: " + err.Error()})
 		return
 	}
-	err = blobStorage.HeadObject(storageBucket, storagePrefix+"/pki/issued/client-"+login+"-"+year+".crt")
+	err = blobStorage.HeadObject(storageBucket, storagePrefix+"/issued/client-"+login+"-"+year+".crt")
 	if err == nil {
-		clientCert, _ = blobStorage.GetObject(storageBucket, storagePrefix+"/pki/issued/client-"+login+"-"+year+".crt")
-		clientKey, _ = blobStorage.GetObject(storageBucket, storagePrefix+"/pki/private/client-"+login+"-"+year+".key")
+		clientCert, _ = blobStorage.GetObject(storageBucket, storagePrefix+"/issued/client-"+login+"-"+year+".crt")
+		clientKey, _ = blobStorage.GetObject(storageBucket, storagePrefix+"/private/client-"+login+"-"+year+".key")
 	}
 
 	// retrieve CA key / crt
-	caKey, err := blobStorage.GetObject(storageBucket, storagePrefix+"/pki/private/ca.key")
+	caKey, err := blobStorage.GetObject(storageBucket, storagePrefix+"/private/ca.key")
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "ca.crt download error: " + err.Error()})
 		return
 	}
-	caCert, err := blobStorage.GetObject(storageBucket, storagePrefix+"/pki/ca.crt")
+	caCert, err := blobStorage.GetObject(storageBucket, storagePrefix+"/ca.crt")
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "ca.crt download error: " + err.Error()})
 		return
 	}
-	taKey, err := blobStorage.GetObject(storageBucket, storagePrefix+"/pki/ta.key")
+	taKey, err := blobStorage.GetObject(storageBucket, storagePrefix+"/ta.key")
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "ta.key download error: " + err.Error()})
 		return
@@ -201,12 +201,12 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// write key and cert to S3
-		err = blobStorage.PutObject(storageBucket, storagePrefix+"/pki/issued/client-"+login+"-"+year+".crt", clientCert.String(), os.Getenv("S3_KMS_ARN"))
+		err = blobStorage.PutObject(storageBucket, storagePrefix+"/issued/client-"+login+"-"+year+".crt", clientCert.String(), os.Getenv("S3_KMS_ARN"))
 		if err != nil {
 			json.NewEncoder(w).Encode(errorResponse{Message: "S3 put error: " + err.Error()})
 			return
 		}
-		err = blobStorage.PutObject(storageBucket, storagePrefix+"/pki/private/client-"+login+"-"+year+".key", clientKey.String(), os.Getenv("S3_KMS_ARN"))
+		err = blobStorage.PutObject(storageBucket, storagePrefix+"/private/client-"+login+"-"+year+".key", clientKey.String(), os.Getenv("S3_KMS_ARN"))
 		if err != nil {
 			json.NewEncoder(w).Encode(errorResponse{Message: "S3 put error: " + err.Error()})
 			return
@@ -235,9 +235,9 @@ func (s *server) getStorage() (storage.StorageIf, string, string, error) {
 	// azure storage
 	if os.Getenv("STORAGE_TYPE") == "azblob" {
 		blobStorage, err := storage.NewAzBlob(os.Getenv("AZ_STORAGE_ACCOUNT_NAME"), os.Getenv("AZ_STORAGE_ACCOUNT_KEY"))
-		return blobStorage, os.Getenv("AZ_STORAGE_ACCOUNT_CONTAINER"), "", err
+		return blobStorage, os.Getenv("AZ_STORAGE_ACCOUNT_CONTAINER"), "/pki", err
 	}
 	// default storage
 	blobStorage, err := storage.NewS3()
-	return blobStorage, os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX"), err
+	return blobStorage, os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX") + "/pki", err
 }

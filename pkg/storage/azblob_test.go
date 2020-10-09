@@ -20,9 +20,19 @@ func TestAzBlobStorage(t *testing.T) {
 	// put object
 	data := "test"
 
+	err = azBlob.HeadObject(containerName, "test.txt")
+	if err == nil {
+		t.Errorf("Expected error, but didn't get error (headobject)")
+	}
+
 	err = azBlob.PutObject(containerName, "test.txt", data, "")
 	if err != nil {
 		t.Errorf("Error while doing PutObject: %s", err)
+	}
+
+	err = azBlob.HeadObject(containerName, "test.txt")
+	if err != nil {
+		t.Errorf("Error while doing HeadObject: %s", err)
 	}
 
 	out, err := azBlob.GetObject(containerName, "test.txt")
