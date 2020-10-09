@@ -87,3 +87,6 @@ func (s *s3Struct) PutObject(bucket, item, data, kmsArn string) error {
 
 	return nil
 }
+func (s *s3Struct) DeleteObject(bucket, item string) error {
+	return fmt.Errorf("Not implemented")
+}

@@ -154,9 +154,7 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check in storage if .crt / .key is already created
-	blobStorage, err := storage.NewS3()
-	storageBucket := os.Getenv("S3_BUCKET")
-	storagePrefix := os.Getenv("S3_PREFIX")
+	blobStorage, storageBucket, storagePrefix, err := s.getStorage()
 	if err != nil {
 		json.NewEncoder(w).Encode(errorResponse{Message: "Could not create session: " + err.Error()})
 		return
@@ -232,4 +230,14 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/download")
 	w.Header().Set("Content-Disposition", "attachment; filename=client-"+strings.Replace(login, "@", "-", -1)+".ovpn")
 	fmt.Fprintf(w, strOvpnConfig)
+}
+func (s *server) getStorage() (storage.StorageIf, string, string, error) {
+	// azure storage
+	if os.Getenv("STORAGE_TYPE") == "azblob" {
+		blobStorage, err := storage.NewAzBlob(os.Getenv("AZ_STORAGE_ACCOUNT_NAME"), os.Getenv("AZ_STORAGE_ACCOUNT_KEY"))
+		return blobStorage, os.Getenv("AZ_STORAGE_ACCOUNT_CONTAINER"), "", err
+	}
+	// default storage
+	blobStorage, err := storage.NewS3()
+	return blobStorage, os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX"), err
 }
