@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/Azure/azure-storage-blob-go v0.10.0
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.3
 	github.com/aws/aws-sdk-go v1.20.12
 	github.com/coreos/go-oidc v2.0.0+incompatible
 	github.com/gorilla/csrf v1.6.0

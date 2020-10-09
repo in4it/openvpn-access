@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
 type azBlob struct {
@@ -23,6 +24,32 @@ func NewAzBlob(accountName, accountKey string) (StorageIf, error) {
 	if err != nil {
 		return nil, err
 	}
+	return NewAzBlobWithCredential(accountName, credential)
+}
+
+func NewAzBlobWithMSI(accountName string) (StorageIf, error) {
+	settings, err := auth.GetSettingsFromEnvironment()
+	if err != nil {
+		return nil, err
+	}
+
+	msi := settings.GetMSI()
+	msi.Resource = "https://storage.azure.com/"
+	token, err := msi.ServicePrincipalToken()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := token.RefreshWithContext(context.Background()); err != nil {
+		return nil, err
+	}
+
+	credential := azblob.NewTokenCredential(token.OAuthToken(), nil)
+
+	return NewAzBlobWithCredential(accountName, credential)
+}
+
+func NewAzBlobWithCredential(accountName string, credential azblob.Credential) (StorageIf, error) {
 	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
 	u, _ := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net", accountName))
 	serviceURL := azblob.NewServiceURL(*u, p)

@@ -1,9 +1,44 @@
 package storage
 
 import (
+	"context"
 	"os"
 	"testing"
+
+	"github.com/Azure/go-autorest/autorest/azure/auth"
 )
+
+const onAzureVM = false
+
+func TestAzConnectivitiy(t *testing.T) {
+	if !onAzureVM {
+		t.Skip("Not on azure VM")
+	}
+	settings, err := auth.GetSettingsFromEnvironment()
+	if err != nil {
+		t.Errorf("Auth error: %s", err)
+		return
+	}
+
+	msi := settings.GetMSI()
+	msi.Resource = "https://storage.azure.com/"
+	token, err := msi.ServicePrincipalToken()
+	if err != nil {
+		t.Errorf("Creds error: %s", err)
+		return
+	}
+
+	if err := token.RefreshWithContext(context.Background()); err != nil {
+		t.Errorf("refresh token error: %s", err)
+		return
+	}
+
+	if len(token.OAuthToken()) == 0 {
+		t.Errorf("Token is empty")
+	}
+	return
+
+}
 
 func TestAzBlobStorage(t *testing.T) {
 	if os.Getenv("TEST_AZURE_STORAGE_ACCOUNT_NAME") == "" {

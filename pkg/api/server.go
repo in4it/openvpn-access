@@ -234,7 +234,12 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 func (s *server) getStorage() (storage.StorageIf, string, string, error) {
 	// azure storage
 	if os.Getenv("STORAGE_TYPE") == "azblob" {
-		blobStorage, err := storage.NewAzBlob(os.Getenv("AZ_STORAGE_ACCOUNT_NAME"), os.Getenv("AZ_STORAGE_ACCOUNT_KEY"))
+		if os.Getenv("AZ_STORAGE_ACCOUNT_KEY") != "" {
+			blobStorage, err := storage.NewAzBlob(os.Getenv("AZ_STORAGE_ACCOUNT_NAME"), os.Getenv("AZ_STORAGE_ACCOUNT_KEY"))
+			return blobStorage, os.Getenv("AZ_STORAGE_ACCOUNT_CONTAINER"), "/pki", err
+		}
+		// with MSI
+		blobStorage, err := storage.NewAzBlobWithMSI(os.Getenv("AZ_STORAGE_ACCOUNT_NAME"))
 		return blobStorage, os.Getenv("AZ_STORAGE_ACCOUNT_CONTAINER"), "/pki", err
 	}
 	// default storage

@@ -16,6 +16,6 @@ Provides a web frontend with OpenID Connect authentication that can create and s
 | S3\_PREFIX | s3 prefix, e.g. openvpn |
 | S3\_KMS\_ARN | KMS ARN to encrypt s3 objects |
 | AWS\_REGION | AWS Region |
-| AZ_STORAGE_ACCOUNT_NAME | azure storage account name (storage type azure) |
-| AZ_STORAGE_ACCOUNT_KEY | azure storage account key (storage type azure) |
-| AZ_STORAGE_ACCOUNT_CONTAINER | azure storage account container (storage type azure) |
+| AZ_STORAGE_ACCOUNT_NAME | azure storage account name (when storage type azure) |
+| AZ_STORAGE_ACCOUNT_KEY | azure storage account key. Leave empty for Managed Service Identity (MSI) (when storage type azure) |
+| AZ_STORAGE_ACCOUNT_CONTAINER | azure storage account container (when storage type azure) |
