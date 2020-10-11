@@ -50,7 +50,7 @@ func (a *Auth) oauthInit() error {
 		}
 		a.authType = "github"
 	} else if os.Getenv("AUTH_TYPE") == "oauth2" {
-		a.oauth2Config.Scopes = strings.Split(os.Getenv("OAUTH2_SCOPES"), ",")
+		a.oauth2Config.Scopes = strings.Split(os.Getenv("OAUTH2_SCOPES"), " ")
 		a.oauth2Config.Endpoint = oauth2.Endpoint{
 			AuthURL:  os.Getenv("OAUTH2_AUTH_URL"),
 			TokenURL: os.Getenv("OAUTH2_TOKEN_URL"),
@@ -69,6 +69,10 @@ func (a *Auth) oauthInit() error {
 		a.oauth2Verifier = provider.Verifier(&oidc.Config{ClientID: os.Getenv("OAUTH2_CLIENT_ID")})
 		// scope
 		a.oauth2Config.Scopes = []string{oidc.ScopeOpenID, "profile", "email"}
+
+		if extraScopes := strings.Split(os.Getenv("OAUTH2_SCOPES"), " "); len(extraScopes) > 0 {
+			a.oauth2Config.Scopes = append(a.oauth2Config.Scopes, extraScopes...)
+		}
 
 		a.authType = "oidc"
 	}
