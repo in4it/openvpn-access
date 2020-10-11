@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	oidc "github.com/coreos/go-oidc"
+	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/jws"
 	"golang.org/x/oauth2"
 )
 
@@ -46,6 +49,13 @@ func (a *Auth) oauthInit() error {
 			TokenURL: "https://github.com/login/oauth/access_token",
 		}
 		a.authType = "github"
+	} else if os.Getenv("AUTH_TYPE") == "oauth2" {
+		a.oauth2Config.Scopes = strings.Split(os.Getenv("OAUTH2_SCOPES"), ",")
+		a.oauth2Config.Endpoint = oauth2.Endpoint{
+			AuthURL:  os.Getenv("OAUTH2_AUTH_URL"),
+			TokenURL: os.Getenv("OAUTH2_TOKEN_URL"),
+		}
+		a.authType = "oauth2"
 	} else {
 		provider, err := oidc.NewProvider(ctx, os.Getenv("OAUTH2_URL"))
 		if err != nil {
@@ -86,6 +96,9 @@ func (a *Auth) getToken(code string) (string, error) {
 		}
 		return token, nil
 	case "github":
+		// return access token
+		return oauth2Token.AccessToken, nil
+	case "oauth2":
 		// return access token
 		return oauth2Token.AccessToken, nil
 	default:
@@ -132,6 +145,19 @@ func (a *Auth) verifyToken(token string) error {
 
 		a.login = githubUser.Login
 
+		return nil
+	case "oauth2":
+		if os.Getenv("OAUTH2_JWKS_URL") != "" {
+			jwks, err := jwk.FetchHTTP(os.Getenv("OAUTH2_JWKS_URL"))
+			if err != nil {
+				return fmt.Errorf("JWKS validation failed: %s", err)
+			}
+
+			_, err = jws.VerifyWithJWKSet([]byte(token), jwks, nil)
+			if err != nil {
+				return fmt.Errorf("VerifyWithJWKSet failed: %s", err)
+			}
+		}
 		return nil
 	default:
 		return fmt.Errorf("Misconfiguration: Auth type not recognized")
