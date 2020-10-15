@@ -64,6 +64,10 @@ func (s *server) Start() {
 	r.HandleFunc(prefix+"/callback", s.callbackHandler)
 	r.HandleFunc(prefix+"/ovpnconfig", s.ovpnConfigHandler)
 
+	if os.Getenv("DEBUG") == "true" {
+		r.HandleFunc(prefix+"/debug", s.debugHandler)
+	}
+
 	http.Handle("/", r)
 
 	// initialize auth
@@ -245,4 +249,25 @@ func (s *server) getStorage() (storage.StorageIf, string, string, error) {
 	// default storage
 	blobStorage, err := storage.NewS3()
 	return blobStorage, os.Getenv("S3_BUCKET"), os.Getenv("S3_PREFIX") + "/pki/", err
+}
+
+func (s *server) debugHandler(w http.ResponseWriter, r *http.Request) {
+	session, err := s.sessionStore.Get(r, "token-session")
+	if err != nil || session.Values["token"] == nil {
+		// handle error
+		json.NewEncoder(w).Encode(errorResponse{Message: "Unauthorized"})
+		return
+	}
+
+	err = s.auth.verifyToken(session.Values["token"].(string))
+	if err != nil {
+		// handle error
+		json.NewEncoder(w).Encode(errorResponse{Message: err.Error()})
+		return
+	}
+
+	var response response
+	response.Message = "Token (verified): " + session.Values["token"].(string)
+	json.NewEncoder(w).Encode(response)
+
 }
