@@ -114,7 +114,14 @@ func (a *Auth) verifyToken(token string) error {
 		if err := a.idToken.Claims(&claims); err != nil {
 			return err
 		}
-		a.login = claims.Email
+
+		if claims.Email != "" {
+			a.login = claims.Email
+		} else if claims.Name != "" {
+			a.login = claims.Name
+		} else {
+			return fmt.Errorf("No login found in token claims (email / name is empty)")
+		}
 
 		return nil
 	case "github":

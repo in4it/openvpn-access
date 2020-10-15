@@ -4,6 +4,7 @@ package api
 type Claims struct {
 	Email    string `json:"email"`
 	Verified bool   `json:"email_verified"`
+	Name     string `json:"name"`
 }
 
 type GitHubUser struct {
