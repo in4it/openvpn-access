@@ -9,6 +9,7 @@ Provides a web frontend with OpenID Connect authentication that can create and s
 | OAUTH2\_CLIENT\_SECRET | client secret |
 | OAUTH2\_REDIRECT\_URL | callback, e.g. http://url/callback |
 | OAUTH2\_URL | oidc url, e.g. https://url/oidc |
+| OAUTH2\_SCOPES | override oauth2 scopes |
 | CSRF\_KEY | 32-byte-long-auth-key |
 | CLIENT\_CERT\_ORG | organisation |
 | STORAGE_TYPE | s3 or azblob (azure blob storage), default is s3 |

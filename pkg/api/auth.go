@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	oidc "github.com/coreos/go-oidc"
 	"golang.org/x/oauth2"
@@ -58,7 +59,12 @@ func (a *Auth) oauthInit() error {
 		// verifier
 		a.oauth2Verifier = provider.Verifier(&oidc.Config{ClientID: os.Getenv("OAUTH2_CLIENT_ID")})
 		// scope
-		a.oauth2Config.Scopes = []string{oidc.ScopeOpenID, "profile", "email"}
+		scopes := os.Getenv("OAUTH2_SCOPES")
+		if len(scopes) > 0 {
+			a.oauth2Config.Scopes = strings.Split(scopes, " ")
+		} else {
+			a.oauth2Config.Scopes = []string{oidc.ScopeOpenID, "profile", "email"}
+		}
 
 		a.authType = "oidc"
 	}
