@@ -228,11 +228,14 @@ func (s *server) ovpnConfigHandler(w http.ResponseWriter, r *http.Request) {
 	strOvpnConfig = strings.Replace(strOvpnConfig, "[CA]", caCert.String(), -1)
 	strOvpnConfig = strings.Replace(strOvpnConfig, "[TLS-AUTH]", taKey.String(), -1)
 
+	// client filename
+	clientLogin := strings.Replace(strings.Replace(login, "@", "-", -1), ".", "-", -1)
+	clientFilename := "client-" + clientLogin + ".ovpn"
 	// write to client
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Content-Type", "application/force-download")
 	w.Header().Set("Content-Type", "application/download")
-	w.Header().Set("Content-Disposition", "attachment; filename=client-"+strings.Replace(login, "@", "-", -1)+".ovpn")
+	w.Header().Set("Content-Disposition", "attachment; filename="+clientFilename)
 	fmt.Fprintf(w, strOvpnConfig)
 }
 func (s *server) getStorage() (storage.StorageIf, string, string, error) {
