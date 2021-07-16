@@ -1,6 +1,6 @@
 module github.com/in4it/openvpn-access
 
-go 1.12
+go 1.16
 
 require (
 	github.com/Azure/azure-storage-blob-go v0.10.0
