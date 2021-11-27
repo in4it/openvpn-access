@@ -14,7 +14,7 @@ RUN apk add -u -t build-tools curl git && \
 #
 # Runtime container
 #
-FROM alpine:latest  
+FROM alpine:3  
 
 RUN apk --no-cache add ca-certificates && mkdir -p /app
 
