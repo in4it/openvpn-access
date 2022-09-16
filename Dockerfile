@@ -1,7 +1,7 @@
 #
 # Build go project
 #
-FROM golang:1.16-alpine as go-builder
+FROM golang:1.19-alpine as go-builder
 
 WORKDIR /openvpn-access
 
@@ -14,7 +14,7 @@ RUN apk add -u -t build-tools curl git && \
 #
 # Runtime container
 #
-FROM alpine:latest  
+FROM alpine:3.16 
 
 RUN apk --no-cache add ca-certificates && mkdir -p /app
 
