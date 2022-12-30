@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/Azure/azure-storage-blob-go v0.10.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.3
-	github.com/aws/aws-sdk-go v1.20.12
+	github.com/aws/aws-sdk-go v1.33.0
 	github.com/coreos/go-oidc v2.0.0+incompatible
 	github.com/gorilla/csrf v1.6.0
 	github.com/gorilla/handlers v1.4.0
@@ -29,14 +29,14 @@ require (
 	github.com/google/uuid v1.1.1 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
-	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
+	github.com/jmespath/go-jmespath v0.3.0 // indirect
 	github.com/mattn/go-ieproxy v0.0.0-20190702010315-6dee0af9227d // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35 // indirect
 	github.com/stretchr/testify v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0 // indirect
-	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3 // indirect
+	golang.org/x/net v0.0.0-20200202094626-16171245cfb2 // indirect
 	golang.org/x/sys v0.0.0-20190412213103-97732733099d // indirect
 	golang.org/x/text v0.3.0 // indirect
 	google.golang.org/appengine v1.4.0 // indirect
